@@ -1,6 +1,6 @@
 # Virtual environments
 venv/
-env/
+# env/
 insurance_env/
 
 # Bytecode and cache files
@@ -15,9 +15,9 @@ __pycache__/
 db.sqlite3
 *.sqlite3
 
-# Django secret keys (if using a `.env` file)
-.env
-*.env
+# # Django secret keys (if using a `.env` file)
+# .env
+# *.env
 
 # Migrations (optional, if you don't want to track generated migrations)
 **/migrations/**
