@@ -5,6 +5,7 @@ from.models import CustomerRecord
 import json
 from .utils import get_comprehensive_analysis
 from .model_utils import retrain_model_from_csv
+from .model_trainer import train_models
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
