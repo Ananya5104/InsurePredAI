@@ -131,6 +131,16 @@ def predict(request):
 def prediction_form(request):
     return render(request, "prediction_form.html")
 
+@api_view(['GET'])
+def health_check(request):
+    """
+    Simple health check endpoint to verify the API is working
+    """
+    return Response({
+        "status": "ok",
+        "message": "InsurePredAI API is running"
+    })
+
 
 def save_customer_data(data, churn_prob, recommendation):
     """
