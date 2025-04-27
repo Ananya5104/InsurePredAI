@@ -44,25 +44,25 @@ const ChurnPred = () => {
   const validateForm = () => {
     const requiredFields = ["age", "earnings", "claimAmount", "planAmount", "creditScore", "daysPassed"];
     const missingFields = requiredFields.filter(field => !formData[field]);
-    
+
     if (missingFields.length > 0) {
       toast.error("Please fill in all required fields", {
         position: "top-center",
       });
       return false;
     }
-    
+
     return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-    
+
     if (!validateForm()) {
       return;
     }
-    
+
     setLoading(true);
 
     const features = [
@@ -79,7 +79,7 @@ const ChurnPred = () => {
       formData.lifeInsurance === "Yes" ? 1 : 0,
       formData.planType === "Basic" ? 0 : 1,
     ];
-  
+
     // 🧠 Construct the raw_data object to save
     const raw_data = {
       age: parseFloat(formData.age),
@@ -93,14 +93,14 @@ const ChurnPred = () => {
       type_of_insurance: "health", // default; update if needed
       plan_type: formData.planType === "Basic" ? "basic" : "premium"
     };
-  
+
     const payload = { features, raw_data };
 
     try {
       const response = await axios.post("http://127.0.0.1:8000/api/predict/", payload);
       setResult(response.data);
       setLoading(false);
-      
+
       // Essential churn risk notification
       if (response.data.churn_analysis.is_churn_risk) {
         toast.error("⚠️ High Churn Risk Detected! Action recommended.", {
@@ -108,12 +108,12 @@ const ChurnPred = () => {
           autoClose: 5000,
         });
       }
-      
+
     } catch (error) {
       console.error("Error making request:", error);
       setLoading(false);
       setError("Failed to get prediction. Please try again.");
-      
+
       toast.error("Failed to get prediction. Please try again.", {
         position: "top-center",
       });
@@ -155,7 +155,7 @@ const ChurnPred = () => {
         pauseOnHover
         draggable
       />
-      
+
       {/* Glassmorphic Container */}
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
@@ -228,7 +228,7 @@ const ChurnPred = () => {
             >
               {loading ? "Processing..." : "Get Prediction 🚀"}
             </motion.button>
-            
+
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -281,8 +281,8 @@ const ChurnPred = () => {
                 <div className={`p-3 sm:p-4 ${result.churn_analysis.is_churn_risk ? 'bg-red-900/50' : 'bg-green-900/50'} rounded-lg`}>
                   <p className="text-gray-300 text-sm">Churn Probability</p>
                   <p className="text-xl sm:text-2xl font-bold text-white">
-                    {result.churn_analysis.churn_probability.toFixed(2)}%
-                    {result.churn_analysis.is_churn_risk && 
+                    {(result.churn_analysis.churn_probability * 100).toFixed(2)}%
+                    {result.churn_analysis.is_churn_risk &&
                       <span className="ml-2 animate-pulse inline-flex h-3 w-3 rounded-full bg-red-500"></span>
                     }
                   </p>
@@ -292,34 +292,34 @@ const ChurnPred = () => {
                   <p className="text-xl sm:text-2xl font-bold">{result.churn_analysis.is_churn_risk ? "High Risk" : "Low Risk"}</p>
                 </div>
               </div>
-              
+
               <div className="mt-4 space-y-2 text-sm sm:text-base">
                 <div className="p-3 bg-purple-900/30 rounded-lg">
                   <p className="font-medium">Recommendation:</p>
                   <p className="font-bold text-purple-200">{result.churn_analysis.recommendation}</p>
                 </div>
-                
+
                 <h3 className="text-base sm:text-lg font-semibold mt-3">Plan Recommendation:</h3>
                 <div className="bg-gray-800/50 p-3 rounded-lg">
                   <p>Recommended Plan: <span className="font-bold text-purple-300">{result.plan_recommendation.recommended_plan_name}</span></p>
                   <p>Plan Message: <span className="font-bold text-purple-200">{result.plan_recommendation.plan_message}</span></p>
                 </div>
-                
+
                 {/* <h3 className="text-base sm:text-lg font-semibold mt-3">Customer Analysis:</h3>
                 <div className="bg-gray-800/50 p-3 rounded-lg grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <p>Customer Value: <span className="font-bold text-yellow-300">{result.customer_analysis.customer_value}</span></p>
                   <p>Value Category: <span className={`font-bold ${
-                    result.customer_analysis.value_category === "High Value" ? "text-green-300" : 
+                    result.customer_analysis.value_category === "High Value" ? "text-green-300" :
                     result.customer_analysis.value_category === "Medium Value" ? "text-yellow-300" : "text-gray-300"
                   }`}>{result.customer_analysis.value_category}</span></p>
                   <p>Segment: <span className="font-bold text-blue-300">{result.customer_analysis.customer_segment}</span></p>
                   <p>Revenue Potential: <span className="font-bold text-green-300">{result.customer_analysis.revenue_potential}</span></p>
                   <p>Cross-sell Opportunity: <span className={`font-bold ${
-                    result.customer_analysis.cross_sell_opportunity === "High" ? "text-green-300" : 
+                    result.customer_analysis.cross_sell_opportunity === "High" ? "text-green-300" :
                     result.customer_analysis.cross_sell_opportunity === "Medium" ? "text-yellow-300" : "text-gray-300"
                   }`}>{result.customer_analysis.cross_sell_opportunity}</span></p>
                 </div> */}
-                
+
                 {/* Customer Recommendations */}
                 <h3 className="text-base sm:text-lg font-semibold mt-3">Customer Recommendations:</h3>
                 {result.customer_recommendations && Object.keys(result.customer_recommendations).map((key) => (

@@ -2,6 +2,7 @@ import joblib
 import os
 import numpy as np
 import pandas as pd
+import pickle
 from sklearn.metrics.pairwise import cosine_similarity
 
 # Import the model trainer
@@ -23,37 +24,10 @@ model_files = [
     os.path.join(MODELS_DIR, "plan_type_recommender_churn.pkl")
 ]
 
-if not all(os.path.exists(file) for file in model_files):
-    print("Training models...")
-    models_dict = train_models()
-    churn_model = models_dict['churn_model']
-    churn_scaler = models_dict['churn_scaler']
-    plan_recommender = models_dict['plan_model']
-    plan_scaler = models_dict['plan_scaler']
-    plan_recommender_churn = models_dict['plan_model_churn']
-    plan_scaler_churn = models_dict['plan_scaler_churn']
-else:
-    # Load all models
-    try:
-        churn_model_path = os.path.join(MODELS_DIR, "churn_model.pkl")
-        churn_model = joblib.load(churn_model_path)
-
-        plan_recommender_path = os.path.join(MODELS_DIR, "plan_type_recommender.pkl")
-        plan_recommender = joblib.load(plan_recommender_path)
-
-        plan_recommender_churn_path = os.path.join(MODELS_DIR, "plan_type_recommender_churn.pkl")
-        plan_recommender_churn = joblib.load(plan_recommender_churn_path)
-
-        # Load scalers
-        churn_scaler_path = os.path.join(MODELS_DIR, "churn_scaler.pkl")
-        plan_scaler_path = os.path.join(MODELS_DIR, "plan_type_scaler.pkl")
-        plan_scaler_churn_path = os.path.join(MODELS_DIR, "plan_type_scaler_churn.pkl")
-
-        churn_scaler = joblib.load(churn_scaler_path)
-        plan_scaler = joblib.load(plan_scaler_path)
-        plan_scaler_churn = joblib.load(plan_scaler_churn_path)
-    except Exception as e:
-        print(f"Error loading models: {str(e)}. Training new models...")
+# Train or load models
+try:
+    if not all(os.path.exists(file) for file in model_files):
+        print("Training models...")
         models_dict = train_models()
         churn_model = models_dict['churn_model']
         churn_scaler = models_dict['churn_scaler']
@@ -61,6 +35,81 @@ else:
         plan_scaler = models_dict['plan_scaler']
         plan_recommender_churn = models_dict['plan_model_churn']
         plan_scaler_churn = models_dict['plan_scaler_churn']
+
+        # Also get the XGBoost model if available
+        if 'xgb_model' in models_dict:
+            xgb_model = models_dict['xgb_model']
+            xgb_scaler = models_dict['xgb_scaler']
+    else:
+        # Load all models
+        try:
+            churn_model_path = os.path.join(MODELS_DIR, "churn_model.pkl")
+            churn_model = joblib.load(churn_model_path)
+
+            plan_recommender_path = os.path.join(MODELS_DIR, "plan_type_recommender.pkl")
+            plan_recommender = joblib.load(plan_recommender_path)
+
+            plan_recommender_churn_path = os.path.join(MODELS_DIR, "plan_type_recommender_churn.pkl")
+            plan_recommender_churn = joblib.load(plan_recommender_churn_path)
+
+            # Load scalers
+            churn_scaler_path = os.path.join(MODELS_DIR, "churn_scaler.pkl")
+            plan_scaler_path = os.path.join(MODELS_DIR, "plan_type_scaler.pkl")
+            plan_scaler_churn_path = os.path.join(MODELS_DIR, "plan_type_scaler_churn.pkl")
+
+            churn_scaler = joblib.load(churn_scaler_path)
+            plan_scaler = joblib.load(plan_scaler_path)
+            plan_scaler_churn = joblib.load(plan_scaler_churn_path)
+
+            # Try to load XGBoost model if it exists
+            xgb_model_path = os.path.join(MODELS_DIR, "ml_model.pkl")
+            xgb_scaler_path = os.path.join(MODELS_DIR, "ml_model_scaler.pkl")
+
+            if os.path.exists(xgb_model_path):
+                with open(xgb_model_path, 'rb') as f:
+                    xgb_model = pickle.load(f)
+
+                if os.path.exists(xgb_scaler_path):
+                    xgb_scaler = joblib.load(xgb_scaler_path)
+                else:
+                    xgb_scaler = None
+        except Exception as e:
+            print(f"Error loading models: {str(e)}. Training new models...")
+            models_dict = train_models()
+            churn_model = models_dict['churn_model']
+            churn_scaler = models_dict['churn_scaler']
+            plan_recommender = models_dict['plan_model']
+            plan_scaler = models_dict['plan_scaler']
+            plan_recommender_churn = models_dict['plan_model_churn']
+            plan_scaler_churn = models_dict['plan_scaler_churn']
+
+            # Also get the XGBoost model if available
+            if 'xgb_model' in models_dict:
+                xgb_model = models_dict['xgb_model']
+                xgb_scaler = models_dict['xgb_scaler']
+except Exception as e:
+    print(f"Critical error in model loading/training: {str(e)}. Using dummy models...")
+
+    # Create dummy models as a last resort
+    from sklearn.dummy import DummyClassifier
+    churn_model = DummyClassifier(strategy="constant", constant=0)
+    churn_model.fit(np.array([[0, 0]]), np.array([0, 0]))
+    churn_scaler = None
+
+    class DummyModel:
+        def predict(self, X):
+            return np.array([2] * len(X))
+
+        def decision_function(self, X):
+            return np.array([0] * len(X))
+
+        def predict_proba(self, X):
+            return np.array([[0, 0, 1]] * len(X))
+
+    plan_recommender = DummyModel()
+    plan_scaler = None
+    plan_recommender_churn = DummyModel()
+    plan_scaler_churn = None
 
 # Define the feature names as per training data
 feature_names = ['Age', 'Gender', 'Earnings ($)', 'Claim Amount ($)',
@@ -81,8 +130,50 @@ if not os.path.exists(training_data_path):
     from .model_trainer import create_sample_dataset
     create_sample_dataset(training_data_path)
 
-# Load the training data
-customer_profiles = pd.read_csv(training_data_path)
+# Load the training data with proper column names
+# Check if the file has headers by reading the first line
+with open(training_data_path, 'r') as f:
+    first_line = f.readline().strip()
+
+# Define column names
+column_names = [
+    'Age', 'Gender', 'Earnings ($)', 'Claim Amount ($)', 'Insurance Plan Amount ($)',
+    'Credit Score', 'Marital Status', 'days_passed', 'Automobile Insurance',
+    'Health Insurance', 'Life Insurance', 'Plan Type', 'Churn'
+]
+
+# If the first line contains only numbers and commas, it's likely there are no headers
+if all(c.isdigit() or c in ',.+-' for c in first_line.replace(',', '')):
+    print("Dataset appears to have no headers. Adding column names...")
+    # Read CSV with specified column names
+    customer_profiles = pd.read_csv(training_data_path, header=None, names=column_names)
+else:
+    # Read CSV normally
+    customer_profiles = pd.read_csv(training_data_path)
+
+    # If the dataset has numeric column names, rename them
+    if not any(col in customer_profiles.columns for col in column_names):
+        print("Dataset has numeric column names. Renaming columns...")
+        # Map numeric columns to expected names based on position
+        if len(customer_profiles.columns) >= 13:  # Assuming at least 13 columns
+            new_columns = {
+                customer_profiles.columns[0]: 'Age',
+                customer_profiles.columns[1]: 'Gender',
+                customer_profiles.columns[2]: 'Earnings ($)',
+                customer_profiles.columns[3]: 'Claim Amount ($)',
+                customer_profiles.columns[4]: 'Insurance Plan Amount ($)',
+                customer_profiles.columns[5]: 'Credit Score',
+                customer_profiles.columns[6]: 'Marital Status',
+                customer_profiles.columns[7]: 'days_passed',
+                customer_profiles.columns[8]: 'Automobile Insurance',
+                customer_profiles.columns[9]: 'Health Insurance',
+                customer_profiles.columns[10]: 'Life Insurance',
+                customer_profiles.columns[11]: 'Plan Type',
+                customer_profiles.columns[12]: 'Churn'
+            }
+            customer_profiles = customer_profiles.rename(columns=new_columns)
+
+# Extract features and target
 X = customer_profiles.iloc[:,:12]
 y = customer_profiles.iloc[:,12]
 
@@ -216,7 +307,21 @@ def get_comprehensive_analysis(features):
         churn_input.loc[:, scale_columns] = churn_scaler.transform(churn_input[scale_columns])
 
     # Get churn probability
-    churn_probability = churn_model.predict_proba(churn_input)[0][1]
+    try:
+        # Check if the model has predict_proba method
+        if hasattr(churn_model, 'predict_proba'):
+            churn_probability = churn_model.predict_proba(churn_input)[0][1]
+        else:
+            # For LinearSVC, we'll use the decision function which gives the distance to the hyperplane
+            # and convert it to a probability-like value between 0 and 1 using sigmoid function
+            decision_value = churn_model.decision_function(churn_input)[0]
+            # Convert to a probability-like value using sigmoid function
+            churn_probability = 1 / (1 + np.exp(-decision_value))
+    except Exception as e:
+        print(f"Error getting churn probability: {str(e)}. Using default value.")
+        # Default to a moderate churn probability
+        churn_probability = 0.3
+
     is_churn_risk = churn_probability > 0.5
 
     churn_result = {

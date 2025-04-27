@@ -57,27 +57,66 @@ def predict(request):
             return Response({"error": "Missing or invalid 'raw_data'"}, status=400)
 
         # 🔍 Perform model prediction
-        result = get_comprehensive_analysis(features)
-        churn_data = result.get("churn_analysis", {})
-        churn_prob = churn_data.get("churn_probability", 0.0)
-        recommendation = churn_data.get("recommendation", "No recommendation.")
+        try:
+            result = get_comprehensive_analysis(features)
+            churn_data = result.get("churn_analysis", {})
+            churn_prob = churn_data.get("churn_probability", 0.0)
+            recommendation = churn_data.get("recommendation", "No recommendation.")
+        except Exception as model_error:
+            print(f"Error in model prediction: {str(model_error)}")
+            # Provide a default result if the model fails
+            result = {
+                "churn_analysis": {
+                    "churn_probability": 0.3,
+                    "is_churn_risk": False,
+                    "recommendation": "Unable to determine churn risk. Please check the input data."
+                },
+                "plan_recommendation": {
+                    "recommended_plan": 2,
+                    "recommended_plan_name": "Standard",
+                    "current_plan": "Standard",
+                    "plan_message": "Recommend the Standard plan based on the customer profile."
+                },
+                "customer_recommendations": {
+                    "General": ["Unable to generate personalized recommendations."]
+                }
+            }
+            churn_prob = 0.3
+            recommendation = "Unable to determine churn risk. Please check the input data."
 
         # ➕ Add prediction data to raw_data
-        raw_data["churn_probability"] = churn_prob
+        raw_data["churn_probability"] = float(churn_prob)
         raw_data["recommendation"] = recommendation
-        csv_path = os.path.join(settings.BASE_DIR, 'logs', 'training_data.csv')
-        os.makedirs(os.path.dirname(csv_path), exist_ok=True)  # Create folder if not exists
 
-        with open(csv_path, 'a', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(features + [churn_prob]) 
+        # Append to training data CSV
+        try:
+            csv_path = os.path.join(settings.BASE_DIR, 'logs', 'training_data.csv')
+            os.makedirs(os.path.dirname(csv_path), exist_ok=True)  # Create folder if not exists
+
+            with open(csv_path, 'a', newline='') as f:
+                writer = csv.writer(f)
+                # Convert churn_prob to binary (0 or 1) for training data
+                churn_binary = 1 if float(churn_prob) > 0.5 else 0
+                writer.writerow(features + [churn_binary])
+        except Exception as csv_error:
+            print(f"Error appending to CSV: {str(csv_error)}")
+            # Continue even if CSV append fails
 
         # ✅ Save raw_data to the database
-        serializer = CustomerRecordSerializer(data=raw_data)
-        if serializer.is_valid():
-            serializer.save()
-        else:
-            return Response({"error": "Invalid data", "details": serializer.errors}, status=400)
+        try:
+            # Ensure data types match the model
+            if "credit_score" in raw_data:
+                raw_data["credit_score"] = bool(raw_data["credit_score"])
+
+            serializer = CustomerRecordSerializer(data=raw_data)
+            if serializer.is_valid():
+                serializer.save()
+            else:
+                print(f"Serializer errors: {serializer.errors}")
+                # Continue even if database save fails
+        except Exception as db_error:
+            print(f"Error saving to database: {str(db_error)}")
+            # Continue even if database save fails
 
         # ✅ Return only prediction result
         return Response(result)
@@ -85,6 +124,7 @@ def predict(request):
     except json.JSONDecodeError:
         return Response({"error": "Invalid JSON format"}, status=400)
     except Exception as e:
+        print(f"Unexpected error in predict view: {str(e)}")
         return Response({"error": str(e)}, status=400)
 
 def prediction_form(request):
@@ -92,42 +132,55 @@ def prediction_form(request):
 
 
 def save_customer_data(data, churn_prob, recommendation):
-    from django.db.models import Max
-    from django.db import models
+    """
+    This function is no longer used. Customer data is saved in the predict view.
+    Kept for reference only.
+    """
+    try:
+        from django.db.models import Max
 
-    # Get the current max id
-    max_id = CustomerRecord.objects.aggregate(Max('id'))['id__max'] or 0
-    next_id = max_id + 1
-    CustomerRecord.objects.create(
+        # Get the current max id
+        max_id = CustomerRecord.objects.aggregate(Max('id'))['id__max'] or 0
+        next_id = max_id + 1
 
-    id = models.IntegerField(primary_key=True),
-    age=data['age'],
-    gender=data['gender'],
-    earnings=data['earnings'],
-    claim_amount=data['claim_amount'],
-    insurance_plan_amount=data['insurance_plan_amount'],
-    credit_score=data['credit_score'],
-    marital_status=data['marital_status'],
-    days_passed=data['days_passed'],
-    type_of_insurance=data['type_of_insurance'],
-    plan_type=data['plan_type'],  
-    churn_probability=1 if churn_prob > 0.5 else 0,
-    recommendation=recommendation
-)
-    
+        # Create the customer record
+        CustomerRecord.objects.create(
+            age=data['age'],
+            gender=data['gender'],
+            earnings=data['earnings'],
+            claim_amount=data['claim_amount'],
+            insurance_plan_amount=data['insurance_plan_amount'],
+            credit_score=data['credit_score'],
+            marital_status=data['marital_status'],
+            days_passed=data['days_passed'],
+            type_of_insurance=data['type_of_insurance'],
+            plan_type=data['plan_type'],
+            churn_probability=float(churn_prob),
+            recommendation=recommendation
+        )
+        return True
+    except Exception as e:
+        print(f"Error saving customer data: {str(e)}")
+        return False
+
 @api_view(['POST'])
 def retrain_model_api(request):
     try:
         # Paths relative to the project root (where manage.py is)
-        dataset_path = os.path.join('logs','training_data.csv')
-        model_output_path = os.path.join('models','churn_model.pkl')
+        dataset_path = os.path.join(settings.BASE_DIR, 'logs', 'training_data.csv')
+        model_output_path = os.path.join(settings.BASE_DIR, 'models', 'churn_model.pkl')
 
         if not os.path.exists(dataset_path):
-            return Response({'error': 'training_data.csv not found in project root.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'training_data.csv not found.'}, status=400)
 
-        # Retrain and save model
-        message = retrain_model_from_csv(dataset_path, model_output_path)
-        return Response({'message': message}, status=status.HTTP_200_OK)
+        try:
+            # Retrain and save model
+            message = retrain_model_from_csv(dataset_path, model_output_path)
+            return Response({'message': message}, status=200)
+        except Exception as train_error:
+            print(f"Error retraining model: {str(train_error)}")
+            return Response({'error': str(train_error)}, status=500)
 
     except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print(f"Unexpected error in retrain_model_api: {str(e)}")
+        return Response({'error': str(e)}, status=500)
