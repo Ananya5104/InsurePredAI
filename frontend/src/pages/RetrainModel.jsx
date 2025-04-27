@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { API_URL } from '../config';
 
 const RetrainModel = () => {
   const [message, setMessage] = useState('');
@@ -10,7 +11,7 @@ const RetrainModel = () => {
     setMessage('');
 
     try {
-      const response = await axios.post('http://127.0.0.1:8000/api/retrain-model/');
+      const response = await axios.post(`${API_URL}/api/retrain-model/`);
       setMessage(response.data.message || 'Model retrained successfully!');
     } catch (error) {
       setMessage(error.response?.data?.error || 'Something went wrong.');
