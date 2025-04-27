@@ -4,35 +4,63 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 
-# Load the pre-trained models
+# Import the model trainer
+from .model_trainer import train_models
+
+# Define paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Current script's directory
 PARENT_DIR = os.path.dirname(BASE_DIR)  # Moves one level up
 MODELS_DIR = os.path.join(PARENT_DIR, "models")
 
-# Load all models
-churn_model_path = os.path.join(MODELS_DIR, "churn_model.pkl")
-churn_model = joblib.load(churn_model_path)
+# Check if models directory exists
+if not os.path.exists(MODELS_DIR):
+    os.makedirs(MODELS_DIR, exist_ok=True)
 
-plan_recommender_path = os.path.join(MODELS_DIR, "plan_type_recommender.pkl")
-plan_recommender = joblib.load(plan_recommender_path)
+# Check if models exist, if not train them
+model_files = [
+    os.path.join(MODELS_DIR, "churn_model.pkl"),
+    os.path.join(MODELS_DIR, "plan_type_recommender.pkl"),
+    os.path.join(MODELS_DIR, "plan_type_recommender_churn.pkl")
+]
 
-plan_recommender_churn_path = os.path.join(MODELS_DIR, "plan_type_recommender_churn.pkl")
-plan_recommender_churn = joblib.load(plan_recommender_churn_path)
+if not all(os.path.exists(file) for file in model_files):
+    print("Training models...")
+    models_dict = train_models()
+    churn_model = models_dict['churn_model']
+    churn_scaler = models_dict['churn_scaler']
+    plan_recommender = models_dict['plan_model']
+    plan_scaler = models_dict['plan_scaler']
+    plan_recommender_churn = models_dict['plan_model_churn']
+    plan_scaler_churn = models_dict['plan_scaler_churn']
+else:
+    # Load all models
+    try:
+        churn_model_path = os.path.join(MODELS_DIR, "churn_model.pkl")
+        churn_model = joblib.load(churn_model_path)
 
-# Load scalers
-churn_scaler_path = os.path.join(MODELS_DIR, "churn_scaler.pkl")
-plan_scaler_path = os.path.join(MODELS_DIR, "plan_type_scaler.pkl")
-plan_scaler_churn_path = os.path.join(MODELS_DIR, "plan_type_scaler_churn.pkl")
+        plan_recommender_path = os.path.join(MODELS_DIR, "plan_type_recommender.pkl")
+        plan_recommender = joblib.load(plan_recommender_path)
 
-try:
-    churn_scaler = joblib.load(churn_scaler_path)
-    plan_scaler = joblib.load(plan_scaler_path)
-    plan_scaler_churn = joblib.load(plan_scaler_churn_path)
-except FileNotFoundError:
-    # Handle the case where scalers aren't needed or available
-    churn_scaler = None
-    plan_scaler = None
-    plan_scaler_churn = None
+        plan_recommender_churn_path = os.path.join(MODELS_DIR, "plan_type_recommender_churn.pkl")
+        plan_recommender_churn = joblib.load(plan_recommender_churn_path)
+
+        # Load scalers
+        churn_scaler_path = os.path.join(MODELS_DIR, "churn_scaler.pkl")
+        plan_scaler_path = os.path.join(MODELS_DIR, "plan_type_scaler.pkl")
+        plan_scaler_churn_path = os.path.join(MODELS_DIR, "plan_type_scaler_churn.pkl")
+
+        churn_scaler = joblib.load(churn_scaler_path)
+        plan_scaler = joblib.load(plan_scaler_path)
+        plan_scaler_churn = joblib.load(plan_scaler_churn_path)
+    except Exception as e:
+        print(f"Error loading models: {str(e)}. Training new models...")
+        models_dict = train_models()
+        churn_model = models_dict['churn_model']
+        churn_scaler = models_dict['churn_scaler']
+        plan_recommender = models_dict['plan_model']
+        plan_scaler = models_dict['plan_scaler']
+        plan_recommender_churn = models_dict['plan_model_churn']
+        plan_scaler_churn = models_dict['plan_scaler_churn']
 
 # Define the feature names as per training data
 feature_names = ['Age', 'Gender', 'Earnings ($)', 'Claim Amount ($)',
@@ -43,7 +71,18 @@ feature_names = ['Age', 'Gender', 'Earnings ($)', 'Claim Amount ($)',
 
 # Use the correct path to the training data file
 LOGS_DIR = os.path.join(PARENT_DIR, "logs")
-customer_profiles = pd.read_csv(os.path.join(LOGS_DIR, "training_data.csv"))
+training_data_path = os.path.join(LOGS_DIR, "training_data.csv")
+
+# Check if training data exists
+if not os.path.exists(training_data_path):
+    # Create logs directory if it doesn't exist
+    os.makedirs(LOGS_DIR, exist_ok=True)
+    # Create a sample dataset using the function from model_trainer
+    from .model_trainer import create_sample_dataset
+    create_sample_dataset(training_data_path)
+
+# Load the training data
+customer_profiles = pd.read_csv(training_data_path)
 X = customer_profiles.iloc[:,:12]
 y = customer_profiles.iloc[:,12]
 
@@ -207,26 +246,129 @@ def get_comprehensive_analysis(features):
 
     # Convert numeric plan type to descriptive name
     plan_names = {1: "Basic", 2: "Standard", 3: "Premium"}
-    current_plan = plan_names.get(int(features[11]))  # Plan type is at index 11
-    recommended_plan_name = plan_names.get(int(recommended_plan))
+
+    # Handle potential errors with current plan
+    try:
+        current_plan_num = int(float(features[11]))
+        current_plan = plan_names.get(current_plan_num, "Standard")  # Default to Standard if not found
+    except (ValueError, IndexError, TypeError):
+        # If there's any error, default to Standard
+        current_plan = "Standard"
+
+    # Handle potential errors with recommended plan
+    try:
+        recommended_plan_num = int(float(recommended_plan))
+        recommended_plan_name = plan_names.get(recommended_plan_num, "Standard")
+    except (ValueError, TypeError):
+        recommended_plan_name = "Standard"
 
     # Generate recommendation message
-    if int(recommended_plan) == int(features[11]):  # Current plan is already optimal
-        plan_message = f"The customer's current {current_plan} plan is already optimal based on their profile."
-    else:
-        plan_message = f"Recommend upgrading from {current_plan} to {recommended_plan_name} plan for better value and reduced churn risk."
+    try:
+        if int(float(recommended_plan)) == int(float(features[11])):  # Current plan is already optimal
+            plan_message = f"The customer's current {current_plan} plan is already optimal based on their profile."
+        else:
+            plan_message = f"Recommend upgrading from {current_plan} to {recommended_plan_name} plan for better value and reduced churn risk."
+    except (ValueError, TypeError):
+        # If there's any error in comparison, provide a generic message
+        plan_message = f"Recommend the {recommended_plan_name} plan based on the customer profile."
+
+    # Ensure all values are valid before creating the result
+    try:
+        recommended_plan_int = int(float(recommended_plan))
+    except (ValueError, TypeError):
+        recommended_plan_int = 2  # Default to Standard (2)
 
     plan_result = {
-        "recommended_plan": int(recommended_plan),
-        "recommended_plan_name": recommended_plan_name,
-        "current_plan": current_plan,
-        "plan_message": plan_message
+        "recommended_plan": recommended_plan_int,
+        "recommended_plan_name": recommended_plan_name or "Standard",
+        "current_plan": current_plan or "Standard",
+        "plan_message": plan_message or f"Recommend the {recommended_plan_name or 'Standard'} plan for optimal coverage."
     }
 
     # 3. CUSTOMER SIMILARITY ANALYSIS
     # Generate personalized recommendations based on similar customers
     try:
-        customer_recommendations = generate_recommendations(temp)
+        # Get similar customers directly instead of calling generate_recommendations
+        similar_indices = get_similar_customers(temp)
+
+        # Filter to non-churned similar customers
+        non_churned_similar = [idx for idx in similar_indices if y.iloc[idx] == 0]
+
+        if not non_churned_similar:
+            # Provide generic recommendations instead of saying we don't have enough data
+            customer_recommendations = {
+                "Insurance_Options": [
+                    "Consider bundling multiple insurance types for better coverage and discounts",
+                    "Our most popular insurance combinations include health and life insurance"
+                ],
+                "Plan_Optimization": [
+                    f"The {current_plan} plan offers good value for your profile",
+                    "Regular policy reviews can help ensure your coverage meets your changing needs"
+                ],
+                "Customer_Benefits": [
+                    "Take advantage of our loyalty program for long-term customers",
+                    "Our mobile app provides easy access to your policy information and claims"
+                ]
+            }
+        else:
+            similar_customers_data = X.iloc[non_churned_similar]
+
+            # Create recommendations dictionary
+            customer_recommendations = {}
+
+            # 1. Insurance Types comparison
+            auto_insurance_popular = similar_customers_data['Automobile Insurance'].mean() > 0.5
+            health_insurance_popular = similar_customers_data['Health Insurance'].mean() > 0.5
+            life_insurance_popular = similar_customers_data['Life Insurance'].mean() > 0.5
+
+            insurance_recs = []
+            if auto_insurance_popular and temp['Automobile Insurance'].iloc[0] == 0:
+                insurance_recs.append("Add automobile insurance - popular among similar customers who stay with us")
+            if health_insurance_popular and temp['Health Insurance'].iloc[0] == 0:
+                insurance_recs.append("Include health insurance coverage - common among customers with your profile")
+            if life_insurance_popular and temp['Life Insurance'].iloc[0] == 0:
+                insurance_recs.append("Consider life insurance protection - beneficial for customers similar to you")
+
+            if insurance_recs:
+                customer_recommendations['Insurance_Options'] = insurance_recs
+
+            # 2. Analyze claim behaviors of similar customers
+            avg_claim = similar_customers_data['Claim Amount ($)'].mean()
+            if temp['Claim Amount ($)'].iloc[0] < avg_claim - 0.5:
+                customer_recommendations['Claim_Optimization'] = [
+                    "You may be under-utilizing your benefits compared to similar customers",
+                    "Schedule a coverage review to ensure you're getting the most from your plan"
+                ]
+            elif temp['Claim Amount ($)'].iloc[0] > avg_claim + 0.5:
+                customer_recommendations['Claim_Optimization'] = [
+                    "Your claim pattern differs from similar satisfied customers",
+                    "Consider our premium protection plan with higher claim limits"
+                ]
+
+            # 3. Credit score-based recommendations
+            avg_credit = similar_customers_data['Credit Score'].mean()
+            if temp['Credit Score'].iloc[0] < avg_credit - 0.1:
+                customer_recommendations['Credit_Improvement'] = [
+                    "Our credit improvement program can help enhance your insurance terms",
+                    "Customers with improved credit scores often receive better rates"
+                ]
+
+            # 4. Additional demographic insights
+            age = temp['Age'].iloc[0]
+            if age < 30:
+                customer_recommendations['Young_Customer'] = [
+                    "Short-term flexible coverage plans for young professionals",
+                    "Digital service with mobile app benefits"
+                ]
+            elif age > 55:
+                customer_recommendations['Senior_Customer'] = [
+                    "Fixed premium rates for long-term loyalty",
+                    "Priority human customer support"
+                ]
+
+            # If no specific recommendations were generated, provide a general one
+            if not customer_recommendations:
+                customer_recommendations['General'] = ["Based on similar customers, your current plan appears optimal."]
     except Exception as e:
         print(f"Error generating recommendations: {str(e)}")
         customer_recommendations = {"General": ["Unable to generate personalized recommendations."]}
