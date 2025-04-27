@@ -1,0 +1,36 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url 'admin:churn_customerrecord_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; {% trans 'Retrain Model' %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <div class="module">
+    <h2>{% trans 'Retrain Churn Prediction Model' %}</h2>
+    <div class="description">
+      <p>
+        This will retrain the churn prediction model using all available customer data. 
+        The process may take a few minutes to complete.
+      </p>
+      <p>
+        <strong>Note:</strong> Retraining the model will replace the existing model with a new one.
+        This action cannot be undone.
+      </p>
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <div class="submit-row">
+        <input type="submit" value="{% trans 'Retrain Model' %}" class="default" />
+        <a href="{% url 'admin:churn_customerrecord_changelist' %}" class="button cancel-link">{% trans 'Cancel' %}</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

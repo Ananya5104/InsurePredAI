@@ -42,24 +42,6 @@ const Home = () => {
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-500 to-purple-700 p-10 text-white space-y-16">
 
-      {/* Admin Button - Top Right Corner */}
-      <motion.div
-        className="absolute top-4 right-4 z-20"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1 }}
-      >
-        <Link
-          to="/retrain"
-          className="bg-gray-800/70 hover:bg-gray-700 text-white text-sm font-medium px-3 py-2 rounded-lg flex items-center space-x-1 border border-gray-600 shadow-lg"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          <span>Retrain Model</span>
-        </Link>
-      </motion.div>
-
       {/* 3D Canvas - Positioned at the Top */}
       <div className="absolute top-12 w-full h-36 flex justify-center">
         <Canvas>

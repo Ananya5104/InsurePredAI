@@ -1,20 +1,19 @@
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, parser_classes
+from rest_framework.decorators import api_view, parser_classes, permission_classes
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.shortcuts import render
-from.models import CustomerRecord
-import json
+from django.contrib.auth.decorators import user_passes_test
+from django.conf import settings
+from .models import CustomerRecord
+from .serializers import CustomerRecordSerializer
 from .utils import get_comprehensive_analysis
 from .model_utils import retrain_model_from_csv
 from .model_trainer import train_models
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from .models import CustomerRecord
-from .serializers import CustomerRecordSerializer
+from rest_framework import status
+import json
 import os
 import csv
-from rest_framework import status
-from django.conf import settings
 
 # @api_view(['POST'])
 # def predict_and_save(request):
@@ -175,8 +174,20 @@ def save_customer_data(data, churn_prob, recommendation):
         return False
 
 @api_view(['POST'])
+@permission_classes([IsAdminUser])
 def retrain_model_api(request):
+    """
+    Retrain the model - restricted to admin users only.
+    This endpoint can be accessed from the Django admin interface.
+    """
     try:
+        # Check if user is authenticated and is staff/admin
+        if not request.user.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=401)
+
+        if not request.user.is_staff:
+            return Response({'error': 'Admin privileges required'}, status=403)
+
         # Paths relative to the project root (where manage.py is)
         dataset_path = os.path.join(settings.BASE_DIR, 'logs', 'training_data.csv')
         model_output_path = os.path.join(settings.BASE_DIR, 'models', 'churn_model.pkl')
