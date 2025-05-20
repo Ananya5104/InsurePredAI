@@ -109,20 +109,26 @@ WSGI_APPLICATION = "backend.wsgi.application"
 
 # Database configuration
 # Use SQLite for development and PostgreSQL for production
-database_url = os.environ.get('DATABASE_URL')
-if database_url:
-    # Production database (PostgreSQL on Render)
-    DATABASES = {
-        'default': dj_database_url.parse(database_url)
+# database_url = os.environ.get('DATABASE_URL')
+# if database_url:
+#     # Production database (PostgreSQL on Render)
+#     DATABASES = {
+#         'default': dj_database_url.parse(database_url)
+#     }
+# else:
+#     # Development database (SQLite)
+#     DATABASES = {
+#         "default": {
+#             "ENGINE": "django.db.backends.sqlite3",
+#             "NAME": BASE_DIR / "db.sqlite3",
+#         }
+#     }
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
-else:
-    # Development database (SQLite)
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
+}
 
 
 # Password validation

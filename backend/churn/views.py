@@ -86,6 +86,8 @@ def predict(request):
 
         # ➕ Add prediction data to raw_data
         raw_data["churn_probability"] = float(churn_prob)
+        # Add binary churn value (Yes/No)
+        raw_data["churn"] = "Yes" if float(churn_prob) > 0.5 else "No"
         raw_data["recommendation"] = recommendation
 
         # Append to training data CSV

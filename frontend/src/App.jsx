@@ -46,7 +46,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/predict" element={<ChurnPred />} />
-          <Route path="/retrain" element={<RetrainModel />} />
+          <Route path="/retrain-model" element={<RetrainModel />} />
         </Routes>
       )}
     </Router>

@@ -17,7 +17,7 @@ class Customer(models.Model):
 
     def __str__(self):
         return self.name
-    
+
 
 class CustomerRecord(models.Model):
     GENDER_CHOICES = [
@@ -40,6 +40,10 @@ class CustomerRecord(models.Model):
         ('premium', 'Premium'),
     ]
 
+    CHURN_CHOICES = [
+        ('Yes', 'Yes'),
+        ('No', 'No'),
+    ]
 
     age = models.IntegerField()
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
@@ -52,9 +56,10 @@ class CustomerRecord(models.Model):
     type_of_insurance = models.CharField(max_length=10, choices=INSURANCE_TYPE_CHOICES)
     plan_type = models.CharField(max_length=10, choices=PLAN_TYPE_CHOICES)
 
+    # Store both for backward compatibility during transition
     churn_probability = models.FloatField(null=True, blank=True)
+    churn = models.CharField(max_length=3, choices=CHURN_CHOICES, null=True, blank=True)
     recommendation = models.TextField(null=True, blank=True)
-    
 
     created_at = models.DateTimeField(auto_now_add=True)
     def __str__(self):

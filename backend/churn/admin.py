@@ -1,20 +1,62 @@
 from django.contrib import admin
-from django.urls import path
-from django.shortcuts import redirect
-from django.template.response import TemplateResponse
 from django.contrib import messages
-from django.http import HttpResponseRedirect
-from django.urls import reverse
 from .models import CustomerRecord
-import requests
-from django.conf import settings
+from .model_trainer import train_model
+
+def retrain_model_action(modeladmin, request, queryset):
+    """Admin action to retrain the model using the data in the database"""
+    try:
+        # Get all customer records
+        all_records = CustomerRecord.objects.all()
+
+        if all_records.count() == 0:
+            messages.error(request, "No data available for model retraining.")
+            return
+
+        # Prepare data for training
+        features = []
+        targets = []
+
+        for record in all_records:
+            # Skip records without churn value
+            if record.churn is None:
+                continue
+
+            # Convert data to the format expected by the model trainer
+            feature = [
+                record.age,
+                1 if record.gender == 'M' else 0,  # Convert gender to binary
+                record.earnings,
+                record.claim_amount,
+                record.insurance_plan_amount,
+                1 if record.credit_score else 0,  # Convert boolean to binary
+                1 if record.marital_status == 'M' else 0,  # Convert marital status to binary
+                record.days_passed,
+                1 if record.type_of_insurance == 'auto' else 0,  # Auto insurance
+                1 if record.type_of_insurance == 'health' else 0,  # Health insurance
+                1 if record.type_of_insurance == 'life' else 0,  # Life insurance
+                1 if record.plan_type == 'premium' else 0  # Plan type (1 for basic, 2 for premium)
+            ]
+
+            features.append(feature)
+            targets.append(1 if record.churn == 'Yes' else 0)  # Convert churn to binary
+
+        # Train the model
+        train_model(features, targets)
+
+        messages.success(request, f"Model retrained successfully with {len(features)} records.")
+    except Exception as e:
+        messages.error(request, f"Error retraining model: {str(e)}")
+
+retrain_model_action.short_description = "Retrain model with all available data"
 
 class CustomerRecordAdmin(admin.ModelAdmin):
-    list_display = ('id', 'age', 'gender', 'earnings', 'claim_amount', 'insurance_plan_amount', 'plan_type', 'churn_probability', 'created_at')
-    list_filter = ('gender', 'plan_type', 'credit_score', 'marital_status')
+    list_display = ('id', 'age', 'gender', 'earnings', 'claim_amount', 'insurance_plan_amount', 'plan_type', 'churn', 'created_at')
+    list_filter = ('gender', 'plan_type', 'credit_score', 'marital_status', 'churn')
     search_fields = ('id', 'age', 'earnings')
     readonly_fields = ('created_at',)
     list_per_page = 20
+    actions = [retrain_model_action]
 
     fieldsets = (
         ('Personal Information', {
@@ -27,58 +69,13 @@ class CustomerRecordAdmin(admin.ModelAdmin):
             'fields': ('type_of_insurance', 'plan_type', 'days_passed')
         }),
         ('Prediction Results', {
-            'fields': ('churn_probability', 'recommendation')
+            'fields': ('churn', 'churn_probability', 'recommendation')
         }),
         ('System Information', {
             'fields': ('created_at',)
         }),
     )
 
-    def get_urls(self):
-        urls = super().get_urls()
-        custom_urls = [
-            path('retrain-model/', self.admin_site.admin_view(self.retrain_model_view), name='retrain-model'),
-        ]
-        return custom_urls + urls
 
-    def retrain_model_view(self, request):
-        """View to handle model retraining from admin interface"""
-        if request.method == 'POST':
-            try:
-                # Make a request to the retrain API endpoint
-                api_url = request.build_absolute_uri('/api/retrain-model/')
-
-                # Get the session cookie
-                session_key = request.COOKIES.get('sessionid')
-
-                response = requests.post(
-                    api_url,
-                    headers={
-                        'Content-Type': 'application/json',
-                        'Cookie': f'sessionid={session_key}'
-                    }
-                )
-
-                if response.status_code == 200:
-                    messages.success(request, f"Model retrained successfully: {response.json().get('message', '')}")
-                else:
-                    messages.error(request, f"Error retraining model: {response.json().get('error', 'Unknown error')}")
-            except Exception as e:
-                messages.error(request, f"Error retraining model: {str(e)}")
-
-            return HttpResponseRedirect(reverse('admin:churn_customerrecord_changelist'))
-
-        context = {
-            'title': 'Retrain Model',
-            'opts': self.model._meta,
-            'app_label': self.model._meta.app_label,
-        }
-        return TemplateResponse(request, 'admin/retrain_model.html', context)
-
-    def changelist_view(self, request, extra_context=None):
-        """Add a button to the changelist view to retrain the model"""
-        extra_context = extra_context or {}
-        extra_context['show_retrain_button'] = True
-        return super().changelist_view(request, extra_context=extra_context)
 
 admin.site.register(CustomerRecord, CustomerRecordAdmin)

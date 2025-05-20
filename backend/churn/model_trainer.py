@@ -348,6 +348,82 @@ def save_models(models_dir, churn_model, churn_scaler, plan_model, plan_scaler,
 
     print(f"All models and scalers saved to {models_dir}")
 
+def train_model(features, targets):
+    """
+    Train models using provided features and targets.
+    This function is used for retraining from the admin panel.
+
+    Args:
+        features (list): List of feature lists for each customer
+        targets (list): List of binary churn values (0 or 1)
+    """
+    # Convert to numpy arrays
+    X = np.array(features)
+    y = np.array(targets)
+
+    # Create a DataFrame for compatibility with existing functions
+    column_names = [
+        'Age', 'Gender', 'Earnings ($)', 'Claim Amount ($)', 'Insurance Plan Amount ($)',
+        'Credit Score', 'Marital Status', 'days_passed', 'Automobile Insurance',
+        'Health Insurance', 'Life Insurance', 'Plan Type'
+    ]
+
+    # Create DataFrame from features
+    df = pd.DataFrame(X, columns=column_names)
+
+    # Add churn column
+    df['Churn'] = y
+
+    # Define columns to scale
+    cols_to_scale = ['Age', 'Earnings ($)', 'Claim Amount ($)', 'Insurance Plan Amount ($)']
+    scaling_cols = ['Earnings ($)', 'Claim Amount ($)', 'Insurance Plan Amount ($)', 'days_passed']
+
+    # Define paths
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    PARENT_DIR = os.path.dirname(BASE_DIR)
+    MODELS_DIR = os.path.join(PARENT_DIR, "models")
+
+    # Create directory if it doesn't exist
+    os.makedirs(MODELS_DIR, exist_ok=True)
+
+    # Train churn prediction model
+    print("Training churn prediction model...")
+    churn_model, churn_scaler = train_churn_model(df, cols_to_scale)
+
+    # Create separate dataframes for churning and non-churning customers
+    print("Preparing data for plan recommender models...")
+    churning_df = df[df['Churn'] == 1].copy()
+    non_churning_df = df[df['Churn'] == 0].copy()
+
+    # Train plan recommender models
+    print("Training plan recommender for non-churning customers...")
+    plan_model, plan_scaler = train_plan_recommender(non_churning_df, cols_to_scale)
+
+    print("Training plan recommender for churning customers...")
+    plan_model_churn, plan_scaler_churn = train_plan_recommender(churning_df, cols_to_scale)
+
+    # Train XGBoost model
+    print("Training XGBoost model for interactive recommendations...")
+    xgb_model, xgb_scaler = train_xgboost_model(df, scaling_cols)
+
+    # Save models and scalers
+    print("Saving models and scalers...")
+    save_models(MODELS_DIR, churn_model, churn_scaler, plan_model, plan_scaler,
+                plan_model_churn, plan_scaler_churn, xgb_model, xgb_scaler)
+
+    print("Model retraining complete!")
+
+    return {
+        'churn_model': churn_model,
+        'churn_scaler': churn_scaler,
+        'plan_model': plan_model,
+        'plan_scaler': plan_scaler,
+        'plan_model_churn': plan_model_churn,
+        'plan_scaler_churn': plan_scaler_churn,
+        'xgb_model': xgb_model,
+        'xgb_scaler': xgb_scaler
+    }
+
 if __name__ == "__main__":
     # Test the function
     train_models()

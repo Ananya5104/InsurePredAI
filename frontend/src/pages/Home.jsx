@@ -73,14 +73,28 @@ const Home = () => {
           >
             Predict customer churn using advanced AI models. Get insights and take action!
           </motion.p>
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-            <Link
-              to="/predict"
-              className="bg-yellow-400 text-black font-semibold px-8 py-4 rounded-lg shadow-xl hover:bg-yellow-500 transition transform hover:-translate-y-1"
-            >
-              Go to Prediction Page 🚀
-            </Link>
-          </motion.div>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+              <Link
+                to="/predict"
+                className="bg-yellow-400 text-black font-semibold px-8 py-4 rounded-lg shadow-xl hover:bg-yellow-500 transition transform hover:-translate-y-1 inline-block"
+              >
+                Go to Prediction Page 🚀
+              </Link>
+            </motion.div>
+
+            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+              <Link
+                to="/retrain-model"
+                className="bg-purple-600 text-white font-semibold px-8 py-4 rounded-lg shadow-xl hover:bg-purple-700 transition transform hover:-translate-y-1 inline-block"
+              >
+                <div className="flex items-center">
+                  <span>Retrain Model 🔄</span>
+                  <span className="ml-2 bg-yellow-300 text-purple-900 text-xs px-2 py-1 rounded-full font-bold">ADMIN</span>
+                </div>
+              </Link>
+            </motion.div>
+          </div>
         </div>
 
         {/* Right Section - Lottie Animation with Hover Effect */}
