@@ -63,7 +63,12 @@ CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React frontend
     "http://127.0.0.1:3000",
+    "http://localhost:5173",  # Vite dev server
+    "http://localhost:5174",  # Vite dev server alternative port
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
     "https://insurepredai-frontend.onrender.com",  # Render frontend
+    "https://insurepredai-frontend.vercel.app",    # Vercel frontend
 ]
 CORS_ALLOW_METHODS = [
     "GET",
@@ -83,6 +88,32 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
 ]
+
+# CSRF settings
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "https://insurepredai-frontend.onrender.com",
+    "https://insurepredai-frontend.vercel.app",
+    "https://insurepredai-backend.onrender.com",
+]
+
+# Session settings - only use secure cookies in production
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = 'None'
+    CSRF_COOKIE_SAMESITE = 'None'
+else:
+    # For local development
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SAMESITE = 'Lax'
 
 
 TEMPLATES = [

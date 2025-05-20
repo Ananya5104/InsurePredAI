@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { API_URL } from '../config';
+import { getBackendUrl } from '../config';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
@@ -9,8 +9,17 @@ const RetrainModel = () => {
 
   const handleRedirectToAdmin = () => {
     setLoading(true);
+
+    // Get the appropriate backend URL based on environment
+    const backendUrl = getBackendUrl();
+
+    // Construct the admin URL
+    const adminUrl = `${backendUrl}/admin/`;
+
+    console.log(`Redirecting to admin panel at: ${adminUrl}`);
+
     // Redirect to the Django admin login page
-    window.location.href = `${API_URL}/admin/`;
+    window.location.href = adminUrl;
   };
 
   return (
@@ -47,6 +56,13 @@ const RetrainModel = () => {
           </p>
           <p className="text-gray-200 mt-2">
             Click the button below to go to the admin login page.
+          </p>
+          <p className="text-gray-200 mt-2 text-sm">
+            Having trouble accessing the admin panel? Try the{" "}
+            <Link to="/admin-access" className="text-yellow-300 hover:underline">
+              direct admin access
+            </Link>{" "}
+            page.
           </p>
 
           <motion.button
