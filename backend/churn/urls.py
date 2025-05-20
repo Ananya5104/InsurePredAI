@@ -1,12 +1,14 @@
 from django.conf import settings
 from django.urls import path, re_path
 from .views import prediction_form, predict, retrain_model_api, health_check
+from .admin_setup import create_admin
 
 urlpatterns = [
     path("", health_check, name="health_check"),  # Root health check endpoint
     path("predict/", predict, name="predict"),  # Your existing API endpoint
     path("prediction-form/", prediction_form, name="prediction_form"),
     path("retrain-model/", retrain_model_api, name="retrain_model"),  # New endpoint for retraining
+    path("create-admin/", create_admin, name="create_admin"),  # Endpoint to create admin user
 ]
 
 # if settings.DEBUG:
